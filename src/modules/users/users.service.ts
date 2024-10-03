@@ -1,3 +1,4 @@
+import { MailerService } from '@nestjs-modules/mailer';
 import { IsEmail } from 'class-validator';
 import { BadRequestException, Injectable } from '@nestjs/common';
 import { CreateUserDto } from './dto/create-user.dto';
@@ -16,6 +17,7 @@ export class UsersService {
   constructor(
     @InjectModel(User.name)
     private userModel: Model<User>,
+    private readonly mailerService: MailerService,
   ) {}
 
   isEmailExist = async (email: string) => {
@@ -109,21 +111,30 @@ export class UsersService {
 
     //Hash password
     const hashPassword = await hashPasswordHelper(password);
+    const codeId = uuidv4();
     const user = await this.userModel.create({
       name,
       email,
       password: hashPassword,
       isActive: false,
-      codeId: uuidv4(),
-      codeExpired: dayjs().add(1, 'minutes'),
+      codeId: codeId,
+      codeExpired: dayjs().add(5, 'minutes'),
+    });
+
+    //send email
+    this.mailerService.sendMail({
+      to: user.email, // list of receivers
+      subject: 'Active your account at @chaleSs', // Subject line
+      template: 'register',
+      context: {
+        name: user?.name ?? user?.email,
+        activationCode: codeId,
+      },
     });
 
     //Return Response
     return {
       _id: user._id,
     };
-
-    //send email
-    return { _id: user.id };
   }
 }
